@@ -21,37 +21,6 @@ To ensure that data _persists_ on IPFS, and is not deleted during garbage collec
 
 [Garbage collection](<https://en.wikipedia.org/wiki/Garbage_collection_(computer_science)>) is a form of automatic resource management widely used in software development. The garbage collector attempts to reclaim memory occupied by objects that are no longer in use. IPFS uses garbage collection to free disk space on your IPFS node by deleting data that it thinks is no longer needed.
 
-The IPFS garbage collector is configured in the `Datastore`section of [the Kubo config file](https://github.com/ipfs/kubo/blob/master/docs/config.md). The important settings related to the garbage collector are:
-
-- `StorageGCWatermark`: The percentage of the `StorageMax` value at which a garbage collection will be triggered automatically, if the daemon is running with automatic garbage collection enabled. The default is 90`.
-
-- `GCPeriod`: Specify how frequently garbage collection should run. Only used if automatic garbage collection is enabled. The default is 1 hour.
-
-To manually start garbage collection, [run `ipfs repo gc`](../reference/kubo/cli.md#ipfs-repo-gc):
-
-```bash
-ipfs repo gc
-
-> removed QmPZhyTu8D7NqR5NvgkgNYsSYD4CNjnyuFejB8i23itJvA
-> removed QmSYQFVAZgEnpa6NxiW5agyj3XU9VR4CbERShXiLhuPPPE
-> removed QmS6SJXApoi59hqD8Naktgakc6UNHK1XDhqhtMg9sBhY8g
-```
-
-To enable automatic garbage collection use `--enable-gc` when starting the IPFS daemon:
-
-```bash
-ipfs daemon --enable-gc
-
-> Initializing daemon...
-> Kubo version: 0.9.0
-> Repo version: 10
-> ...
-```
-
-::: tip
-If you use IPFS Desktop, you can trigger garbage collection by clicking on the taskbar icon of the IPFS Desktop application and selecting **Advanced** → **Run Garbage Collector**.
-:::
-
 ## Pinning in context
 
 An IPFS node can protect data from garbage collection based on different kinds of user events:
@@ -73,10 +42,15 @@ To ensure that your important data is retained, you may want to use a pinning se
 
 Some available pinning service providers are:
 
+:::warning
+Some of the pinning services listed below are operated by third party companies. There is no guarantee that these third party companies will continue to maintain their pinning service. It is strongly recommended that you thoroughly research a pinning service before using it to host your data.
+:::
+
+- [4EVERLAND Bucket](https://www.4everland.org/bucket/)
 - [Filebase](https://filebase.com/)
-- [Infura](https://infura.io/)
 - [NFT.Storage](https://nft.storage/)
 - [Pinata](https://pinata.cloud/)
+- [Scaleway](https://labs.scaleway.com/en/ipfs-pinning/)
 - [Web3.Storage](https://web3.storage/)
 
 See how to [work with remote pinning services](../how-to/work-with-pinning-services.md).
@@ -87,19 +61,10 @@ Storing data using a personal IPFS node is easy, but it can be inconvenient sinc
 
 ### Storing data with Filecoin
 
-[Filecoin](https://filecoin.io) is a decentralized storage network in which storage providers rent their storage space to clients. The client and the storage provider agree on how much data will be stored, for how long, and at what cost. This agreement is called a _deal_. Once both parties agree to a deal, the client sends the data to the storage provider, who periodically verifies that they are correctly storing the data. When the client wants the data back, they send a request to the storage provider, who initiates the data transfer back to the client. For more information on how Filecoin works, head over to the [official Filecoin documentation →](https://docs.filecoin.io/about-filecoin/how-filecoin-works/)
+[Filecoin](https://filecoin.io) is a decentralized storage network in which storage providers rent their storage space to clients. The client and the storage provider agree on how much data will be stored, for how long, and at what cost. This agreement is called a _deal_. Once both parties agree to a deal, the client sends the data to the storage provider, who periodically verifies that they are correctly storing the data. When the client wants the data back, they send a request to the storage provider, who initiates the data transfer back to the client. For more information on how Filecoin works, head over to the [official Filecoin documentation →](https://docs.filecoin.io/about/basics/how-filecoin-works/)
 
 Filecoin provides users with a dependable, long-term storage solution. However, there are some limitations to consider. The retrieval process is not always as fast as an IPFS pinning service, and the minimum file size accepted by a Filecoin storage provider can be several GiB. Also, the process for creating a storage deal may seem complicated to new users who aren't familiar with blockchain transactions or simply aren't comfortable working within a command line.
 
 ### IPFS + Filecoin solutions
 
 Fortunately, there is a growing community of tools and service providers that help simplify the process of making content available over IPFS while also persisting the data via Filecoin. These solutions make it simple to store data using decentralized protocols by acting both as IPFS pinning services and Filecoin storage platforms. Combining the two means that when you upload a file, that file is immediately available for download. Additionally, combined IPFS + Filecoin solutions will periodically bundle data and create a deal with a reputable Filecoin storage provider, ensuring that the data is available in long-term storage. Many solutions include API client libraries for developers to integrate into their apps and services, as well as web interfaces for quickly managing and inspecting files.
-
-Options in this category include:
-
-- [Web3.Storage](https://Web3.Storage)
-- [NFT.storage](https://nft.storage/)
-- [Estuary](https://estuary.tech)
-- [Powergate](https://docs.filecoin.io/build/powergate)
-- [ChainSafe Storage](https://storage.chainsafe.io)
-- [Fleek Storage](https://fleek.co/storage)
