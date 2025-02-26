@@ -1,27 +1,30 @@
 ---
-title: IPNS (InterPlanetary Name System) and Mutability
+title: IPNS (InterPlanetary Name System)
 description: Learn about mutability in IPFS, InterPlanetary Name System (IPNS), and how it can be used in conjunction with IPFS.
 ---
 
 # InterPlanetary Name System (IPNS)
 
-- [Mutability in IPFS](#mutability-in-ipfs)
-- [How IPNS works](#how-ipns-works)
-  - [Anatomy of an IPNS name](#anatomy-of-an-ipns-name)
-    - [How IPNS names relate to content paths](#how-ipns-names-relate-to-content-paths)
-  - [IPNS names are self-certifying](#ipns-names-are-self-certifying)
-  - [Common IPNS operations](#common-ipns-operations)
-  - [IPNS is transport agnostic](#ipns-is-transport-agnostic)
-    - [IPNS over the DHT](#ipns-over-the-dht)
-    - [IPNS over PubSub](#ipns-over-pubsub)
-  - [Tradeoffs between consistency vs. availability](#tradeoffs-between-consistency-vs-availability)
-    - [IPNS record validity](#ipns-record-validity)
-    - [Practical considerations](#practical-considerations)
-- [IPNS in practice](#ipns-in-practice)
-  - [Resolving IPNS names using IPFS gateways](#resolving-ipns-names-using-ipfs-gateways)
-  - [Publishing IPNS names](#publishing-ipns-names)
-- [Alternatives to IPNS](#alternatives-to-ipns)
-- [Further Resources](#further-resources)
+- [InterPlanetary Name System (IPNS)](#interplanetary-name-system-ipns)
+  - [Mutability in IPFS](#mutability-in-ipfs)
+  - [How IPNS works](#how-ipns-works)
+    - [Anatomy of an IPNS name](#anatomy-of-an-ipns-name)
+      - [How IPNS names relate to content paths](#how-ipns-names-relate-to-content-paths)
+    - [IPNS names are self-certifying](#ipns-names-are-self-certifying)
+    - [Common IPNS operations](#common-ipns-operations)
+    - [IPNS is transport agnostic](#ipns-is-transport-agnostic)
+      - [IPNS over the DHT](#ipns-over-the-dht)
+      - [IPNS over PubSub](#ipns-over-pubsub)
+        - [Publishing IPNS records over PubSub lifecycle](#publishing-ipns-records-over-pubsub-lifecycle)
+    - [Tradeoffs between consistency vs. availability](#tradeoffs-between-consistency-vs-availability)
+      - [IPNS record validity](#ipns-record-validity)
+      - [IPNS record TTL](#ipns-record-ttl)
+      - [Practical considerations](#practical-considerations)
+  - [IPNS in practice](#ipns-in-practice)
+    - [Resolving IPNS names using IPFS gateways](#resolving-ipns-names-using-ipfs-gateways)
+    - [Publishing IPNS names](#publishing-ipns-names)
+  - [Alternatives to IPNS](#alternatives-to-ipns)
+  - [Further Resources](#further-resources)
 
 ## Mutability in IPFS
 
@@ -31,7 +34,11 @@ Yet, there are many situations where content-addressed data needs to be regularl
 
 The InterPlanetary Name System (IPNS) is a system for creating such mutable pointers to CIDs known as **names** or **IPNS names**. IPNS names can be thought of as links that can be updated over time, while retaining the verifiability of content addressing.
 
-> **Note:** Technically, an IPNS name can point to an arbitrary content path (`/ipfs/` or `/ipns/`), including another IPNS name or DNSLink path. However, it most commonly points to a fully resolved and immutable path, i.e. `/ipfs/[CID]`.
+By analogy, IPNS names are like tags in git, which can be updated over time, and CIDs are like commit hashes in Git, which point to a snapshot of the files in the repository.
+
+::: callout
+An IPNS name can point to any arbitrary content path (`/ipfs/` or `/ipns/`), *including another IPNS name or DNSLink path*. However, it most commonly points to a fully resolved and immutable path, i.e. `/ipfs/[CID]`.
+:::
 
 ## How IPNS works
 
@@ -115,9 +122,9 @@ The main implication of this difference is that IPNS operations (publishing and 
 
 #### IPNS over the DHT
 
-The DHT is the default transport mechanism for IPNS records in most IPFS implementations, e.g. Kubo, and js-ipfs.
+The DHT is the default transport mechanism for IPNS records in many IPFS implementations.
 
-Due to the ephemeral nature of the DHT, peers forget records after 24 hours. This applies to any record in the DHT, irrespective of the `validity` (also referred to as `lifetime`) field in the IPNS record.
+Due to the ephemeral nature of the DHT, records expire [after 48 hours](https://github.com/libp2p/specs/tree/b5f7fce29b32d4c7d0efe37b019936a11e5db872/kad-dht#content-provider-advertisement-and-discovery). This applies to any record in the DHT, irrespective of the `validity` (also referred to as `lifetime`) field in the IPNS record.
 
 Therefore, IPNS records need to be regularly (re-)published to the DHT. Moreover, publishing to the DHT at regular intervals ensures that the IPNS name can be resolved even when there's high node churn (nodes coming and going.)
 
@@ -136,7 +143,7 @@ IPNS over PubSub uses the [Libp2p PubSub](https://docs.libp2p.io/concepts/publis
 
 This is achieved by deriving the PubSub topic name from the IPNS name so that each IPNS name has a unique topic.
 
-Because PubSub doesn't have the notion of persistence (messages are ephemeral and dropped after propagation), IPNS over PubSub [adds a persistence layer](https://github.com/ipfs/specs/blob/main/naming/pubsub.md#layering-persistence-onto-libp2p-pubsub) to ensure that IPNS records are always available to the network.
+Because PubSub doesn't have the notion of persistence (messages are ephemeral and dropped after propagation), IPNS over PubSub [adds a persistence layer](https://github.com/ipfs/specs/blob/main/ipns/IPNS_PUBSUB.md#layering-persistence-onto-libp2p-pubsub) to ensure that IPNS records are always available to the network.
 
 In Kubo, IPNS over PubSub is not enabled by default and can be enabled using the [`Ipns.UsePubsub`](https://github.com/ipfs/kubo/blob/master/docs/config.md#ipnsusepubsub) configuration.
 
@@ -148,16 +155,16 @@ It should be noted that there's an upper limit to the number of unique IPNS name
 
 ##### Publishing IPNS records over PubSub lifecycle
 
-1. Create a record and sign it
-2. Calculate PubSub topic name from IPNS name
-3. Join the topic by querying the DHT for the topic's provider records
-4. Publish the IPNS record to the topic
-5. Whenever [a new peer joins the topic](https://github.com/libp2p/go-libp2p-pubsub-router/blob/292d99457d224853706c5e49f8ddc112740a856a/pubsub.go#L538-L560) (specifically your mesh), ask them for the record. If they respond with a newer record, update it locally and publish the updated record to the.
-6. Periodically (by default every 10 minutes) rebroadcast the IPNS record,
+1. Create a record and sign it.
+2. Calculate PubSub topic name from IPNS name.
+3. Join the topic by querying the DHT for the topic's provider records.
+4. Publish the IPNS record to the topic.
+5. Whenever [a new peer joins the topic](https://github.com/libp2p/go-libp2p-pubsub-router/blob/292d99457d224853706c5e49f8ddc112740a856a/pubsub.go#L538-L560) (specifically your mesh), ask them for the record. If they respond with a newer record, update it locally and publish the updated record to the topic.
+6. Periodically (by default every 10 minutes) rebroadcast the IPNS record.
 
 Steps 5 and 6 describe from a high level how IPNS record persistence is layered over PubSub by ensuring continuous propagation of the IPNS record in the face of node churn (nodes dropping in and out of the network).
 
-> Further details about the IPNS over PubSub protocol can be found in the [IPNS over PubSub Spec](https://github.com/ipfs/specs/blob/main/naming/pubsub.md#protocol)
+> Further details about the IPNS over PubSub protocol can be found in the [IPNS over PubSub Spec](https://github.com/ipfs/specs/blob/main/ipns/IPNS_PUBSUB.md#protocol)
 
 ### Tradeoffs between consistency vs. availability
 
@@ -169,15 +176,34 @@ Availability means resolving to a valid IPNS record, at the cost of potentially 
 
 #### IPNS record validity
 
-When setting the `validity` (referred to as [`lifetime` by Kubo](https://github.com/ipfs/kubo/blob/master/docs/config.md#ipnsrecordlifetime)) field of an IPNS record, you typically need to choose whether you favor **consistency** (short validity period, e.g. 24 hours) or **availability** (long validity period, e.g. 1 month), due to the inherent trade-off between the two.
+When setting the `validity` (referred to as [`lifetime` by Kubo](https://github.com/ipfs/kubo/blob/master/docs/config.md#ipnsrecordlifetime)) field of an IPNS record, you typically need to choose whether you favor **consistency** (short validity period, e.g. 48 hours) or **availability** (long validity period, e.g. 1 month), due to the inherent trade-off between the two.
+
+#### IPNS record TTL
+
+If you experience slow IPNS update propagation, the Time-to-Live (TTL) setting is the first thing to check.
+
+##### TTL as a Publisher
+
+When you publish an IPNS Record, the default TTL, which controls caching, might be set to a high value, such as one hour. If you want third-party gateways and nodes to bypass the cache and check for updates more frequently, consider lowering this value.
+
+- **Kubo**: Refer to the `--ttl` option in [`ipfs name publish --help`](https://docs.ipfs.tech/reference/kubo/cli/#ipfs-name-publish) for details on adjusting this setting.
+- **Note**: If your IPNS Record is used behind a DNSLink (e.g., `/ipns/example.com` pointing to `/ipns/k51..libp2p-key`), the DNS TXT record at `_dnslink.example.com` has its own TTL. This DNS TTL also affects caching. Ensure that both TTL values are aligned for consistent behavior.
+
+##### TTL as a Gateway Operator
+
+You should have the ability to override the TTL provided by the publisher and set a lower cap on how long resolution results are cached.
+
+- **Kubo**: Configure this using the [`Ipns.MaxCacheTTL`](https://github.com/ipfs/kubo/blob/master/docs/config.md#ipnsmaxcachettl) setting.
+- **Rainbow**: Adjust this with the [`RAINBOW_IPNS_MAX_CACHE_TTL`](https://github.com/ipfs/rainbow/blob/main/docs/environment-variables.md#rainbow_ipns_max_cache_ttl) environment variable.
 
 #### Practical considerations
 
-One of the most important things to consider with IPNS names is **how frequently you intend on updating the name**.
+The most important thing to consider with IPNS names is **how frequently you intend on updating the name** and **how long a valid record should be cached before checking for an update**.
 
-Practically, two levers within your control determine where your IPNS name is on the spectrum between consistency and availability:
+Practically, levers within your control determine where your IPNS name is on the spectrum between consistency and availability:
 
-- **IPNS record validity:** longer validity will veer towards availability. Moreover, longer validity will reduce the dependence on the keyholder (which for most purposes is stored on a single machine and rare shared) since the record can continue to persist without requiring the private key holder to sign a new record. Another benefit of a longer validity is that the transport can be delegated to other nodes or services (such as [w3name](https://staging.web3.storage/docs/how-tos/w3name/)), without compromising the private key.
+- **IPNS record validity:** longer validity will veer towards availability. Moreover, longer validity will reduce the dependence on the key holder (which for most purposes is stored on a single machine and rare shared) since the record can continue to persist without requiring the private key holder to sign a new record. Another benefit of a longer validity is that the transport can be delegated to other nodes or services (such as [w3name](https://docs.storacha.network/how-to/w3name/)), without compromising the private key.
+- **IPNS record TTL:** longer TTL trades update propagation speed for better page load performance and resiliency.
 - **Transport mechanism:** the DHT veers towards consistency while PubSub veers towards availability. However, with Kubo, IPNS names are always published to the DHT, while PubSub is opt-in. For most purposes, enabling PubSub is a net gain unless you hit the upper limit of connections as a result of too many PubSub subscriptions.
 
 ## IPNS in practice
@@ -189,21 +215,17 @@ IPNS names can be resolved by [IPFS gateways](ipfs-gateway.md) in a _trusted_ fa
 - Path resolution: `https://ipfs.io/ipns/{ipns-name}`
 - Subdomain resolution: `https://{ipns-name}.ipns.dweb.link`
 
-For example:
-
-- [https://ipfs.io/ipns/k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8](https://ipfs.io/ipns/k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8)
-
 > **Note** IPNS resolution via an IPFS gateway is **trusted** (in the sense of trusting the gateway) which means you delegate IPNS resolution to the gateway without any means to verify the authenticity response you get, i.e the content path and signature of the IPNS record.
 
 <!-- ### Third-party providing/publishing w3name -->
 
 ### Publishing IPNS names
 
-See the following guide on [publishing IPNS names with Kubo and js-ipfs](../how-to/publish-ipns.md).
+See the following guide on [publishing IPNS names with Kubo and Helia](../how-to/publish-ipns.md).
 
 ## Alternatives to IPNS
 
-IPNS is not the only way to create mutable addresses on IPFS. You can also use [DNSLink](dnslink.md), which is currently much faster than IPNS and also uses human-readable names. Other community members are exploring ways to use blockchains to store common name records.
+IPNS is not the only way to create mutable addresses on IPFS. You can also use [DNSLink](dnslink.md), which is currently much faster than IPNS, uses human-readable names, and can also point to IPNS names. Other community members are exploring ways to use blockchains to store common name records.
 
 ## Further Resources
 
